@@ -10,8 +10,7 @@ Usage:
   job queue                      what /factory run should do with each labeled issue
   job create <issue>             new job for an open `factory` issue; prints the job id
   job advance <job> <stage>      move a job to <stage>, or refuse
-  job handoff <job>              APPROVE → sync, gate, ready the PR and hand it to a human
-  job merge <job>                alias for handoff; the factory never merges by itself
+  job merge <job>                APPROVE → sync, gate, push, merge the PR and clean up
   job feedback <job>             needs-human → build, with your feedback (stdin) as feedback-<k>.md
   job reject <job>               needs-info or needs-human → rejected, with your reason (stdin) as rejection.md
   job agents <job> <json>        record the routed agent set (called by factory/bin/route)
@@ -623,21 +622,17 @@ def cmd_queue():
         print("\t".join(str(c) for c in row))
 
 
-def cmd_handoff(job):
-    """Sync, gate and ready an approved PR, then wait for a human to merge it.
-
-    The factory never merges. `job merge` is kept as an alias for scripts that
-    still use the upstream command name.
-    """
+def cmd_merge(job):
+    """Merge an APPROVE'd PR after syncing and re-running the gate."""
     sync(job)
     if job["stage"] == "approve":
         save(advance(job, "merging"))
     if job["stage"] != "merging":
         die(f"{job['id']} is in {job['stage']}, not approve or merging")
-    require(job["pr"], "there is no PR to hand over")
+    require(job["pr"], "there is no PR to merge")
     if pr_state(job) == "MERGED":
         save(advance(sync(job), "merged"))
-        print(f"{job['id']}: PR #{job['pr']} was already merged by a human")
+        print(f"{job['id']}: merged PR #{job['pr']}")
         return
 
     def fail(why):
@@ -658,15 +653,13 @@ def cmd_handoff(job):
         git(job, "push", "origin", job["branch"])
         if gh_json("pr", "view", str(job["pr"]), "--json", "isDraft")["isDraft"]:
             gh("pr", "ready", str(job["pr"]))
+        gh("pr", "merge", str(job["pr"]), f"--{CONFIG['merge_method']}")
     except Refused as e:
-        return fail(f"The handoff failed:\n\n```\n{e}\n```")
-    save(advance(sync(job), "needs-human"))
-    print(f"{job['id']}: PR #{job['pr']} is ready; a human must merge it")
-
-
-def cmd_merge(job):
-    """Backwards-compatible name for the human handoff."""
-    return cmd_handoff(job)
+        return fail(f"The merge failed:\n\n```\n{e}\n```")
+    # GitHub may already have deleted the branch on merge.
+    run(["git", "push", "origin", "--delete", job["branch"]], check=False)
+    save(advance(sync(job), "merged"))
+    print(f"{job['id']}: merged PR #{job['pr']}")
 
 
 def cmd_feedback(job, text):
@@ -746,8 +739,6 @@ def main(argv):
             job = advance(sync(resolve(args[0])), args[1])
             save(sync(job))
             print(f"{job['id']}: {job['stage']} (round {job['round']})")
-        elif cmd == "handoff" and len(args) == 1:
-            cmd_handoff(resolve(args[0]))
         elif cmd == "merge" and len(args) == 1:
             cmd_merge(resolve(args[0]))
         elif cmd == "session" and len(args) in {2, 3}:

@@ -87,11 +87,26 @@ class CommandTests(unittest.TestCase):
         meta = frontmatter(text)
         self.assertTrue(meta.get("description"))
         self.assertIn("$ARGUMENTS", text)
-        for phrase in ("subagent", "sessionID", "job session", "job handoff",
+        for phrase in ("subagent", "sessionID", "job session", "job merge",
                        "Job folder:", "quoted data", "base_branch"):
             self.assertIn(phrase, text, phrase)
-        self.assertNotIn("gh pr merge", text)
+        self.assertIn("gh pr merge", text)
         self.assertIn("/factory run", text)
+
+    def test_approver_decision_semantics_match_upstream(self):
+        command = COMMAND.read_text()
+        approver = (AGENTS / "approver.md").read_text()
+        for phrase in ("job merge <id>", "gh pr merge", "APPROVE", "ESCALATE"):
+            self.assertIn(phrase, command, phrase)
+        self.assertNotIn("job handoff", command)
+        self.assertNotIn("human makes the final merge", command)
+        self.assertIn("merges the PR with no human looking", approver)
+        self.assertIn("runs `gh pr merge`", approver)
+        for condition in ("money, access or identity", "deploy, CI or hosting",
+                          "database schema", "adds a\n  dependency",
+                          "product or business decision"):
+            self.assertIn(condition, approver, condition)
+        self.assertNotIn("human handoff", approver)
 
     def test_command_covers_the_full_pipeline(self):
         text = COMMAND.read_text()
@@ -111,6 +126,14 @@ class ProjectConfigTests(unittest.TestCase):
         self.assertEqual(config["worktree"]["directory"], ".worktrees")
         self.assertEqual(config["model"], "anthropic/claude-sonnet-5-5")
         self.assertTrue(any(rule["action"] == "subagent" for rule in config["permissions"]))
+
+    def test_job_state_machine_has_no_handoff_command(self):
+        job = (REPO / "factory" / "bin" / "job").read_text()
+        self.assertIn("def cmd_merge(job):", job)
+        self.assertIn('"pr", "merge", str(job["pr"]), f"--{CONFIG[\'merge_method\']}"', job)
+        self.assertNotIn("cmd_handoff", job)
+        self.assertNotIn("job handoff", job)
+        self.assertNotIn("alias for handoff", job)
 
     def test_no_claude_agent_directory_is_left(self):
         self.assertFalse((REPO / ".claude").exists())

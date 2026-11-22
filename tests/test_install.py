@@ -148,10 +148,11 @@ class DocsTests(unittest.TestCase):
         self.assertIn("/factory/jobs/", lines)
         self.assertIn("/.worktrees/", lines)
 
-    def test_readme_documents_the_human_merge_remit(self):
+    def test_readme_documents_the_upstream_merge_semantics(self):
         text = (REPO / "README.md").read_text()
-        for phrase in ("job handoff", "human", "factory/install", "factory/labels"):
+        for phrase in ("job merge", "APPROVE", "ESCALATE", "factory/install", "factory/labels"):
             self.assertIn(phrase, text, phrase)
+        self.assertNotIn("job handoff", text)
 
     def test_agents_md_exists_for_project_agents(self):
         text = (REPO / "AGENTS.md").read_text()

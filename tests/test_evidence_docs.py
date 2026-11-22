@@ -12,12 +12,19 @@ class EvidenceDocsTests(unittest.TestCase):
             "issue #4",
             "PR #5",
             "SMOKE.md",
-            "job handoff",
+            "job merge",
             "opencode/big-pickle",
             "- [x] One real issue taken end-to-end",
         ):
             self.assertIn(phrase, text, phrase)
+        self.assertNotIn("job handoff", text)
         self.assertNotIn("- [ ] One real issue taken end-to-end", text)
+
+    def test_readme_keeps_a_human_in_the_escalation_path_only(self):
+        text = (REPO / "README.md").read_text()
+        self.assertIn("APPROVE auto-merges", text)
+        self.assertIn("ESCALATE parks the job", text)
+        self.assertNotIn("A human always makes the final merge call", text)
 
     def test_design_status_matches_the_landed_port(self):
         text = (REPO / "DESIGN.md").read_text()
@@ -25,6 +32,15 @@ class EvidenceDocsTests(unittest.TestCase):
         self.assertIn("issue #4 → PR #5", text)
         self.assertNotIn("end-to-end spike pending", text)
         self.assertNotIn("The remaining work is the\nend-to-end spike", text)
+
+    def test_design_records_the_upstream_merge_contract(self):
+        for name in ("DESIGN.md", "factory/README.md", "AGENTS.md"):
+            text = (REPO / name).read_text()
+            self.assertNotIn("job handoff", text, name)
+        design = (REPO / "DESIGN.md").read_text()
+        self.assertIn("APPROVE auto-merges", design)
+        self.assertIn("ESCALATE parks the job", design)
+        self.assertIn("gh pr merge", design)
 
 
 if __name__ == "__main__":
