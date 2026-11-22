@@ -1,8 +1,8 @@
 # Design: a software factory on OpenCode
 
-**Status:** accepted — port implemented; end-to-end spike pending
+**Status:** accepted — port implemented; end-to-end spike complete
 **Date:** 17 Nov 2026
-**Updated:** 22 Nov 2026 (port landed, human-merge remit chosen, install support added)
+**Updated:** 22 Nov 2026 (port landed, human-merge remit chosen, install support added, spike proven)
 **Upstream:** [`zazencodes/zazencodes-season-3/src/software-factory-claude-code-v2`](https://github.com/zazencodes/zazencodes-season-3/tree/main/src/software-factory-claude-code-v2) (GPLv3)
 
 ## 1. Summary
@@ -193,29 +193,27 @@ details are deployment concerns, not part of the factory design.
 
 ## 9. Phased plan
 
-The model track, gate and OpenCode port are complete. The remaining work is the
-end-to-end spike in a target project. Implementation order differed from the
-numbering: **the gate (item 2) was built before the spike (item 1)**, because the
-spike's `gate` stage calls `checks.sh`
+The model track, gate, OpenCode port, drop-in installer and end-to-end spike are
+complete. Implementation order differed from the numbering: **the gate (item 2)
+was built before the spike (item 1)**, because the spike's `gate` stage calls `checks.sh`
 and upstream's version is not useful for a generic project. A gate that is green
 on the base branch and red on a broken fixture is what makes the spike
 meaningful.
 
-1. **Phase 0 — spike (no repo risk).** Scratch clone. Port the agents + command,
-   drop the hook, rewrite `job`'s cost query, set `concurrency: 1`. Get one
-   trivial issue from `intake` to an open PR. Exit criterion: the `subagent`
-   resume loop and the cost query both work.
-2. **Phase 1 — make the gate real.** Author `factory/checks.sh` (§6.1) and
-   prove it passes on the base branch. Exit criterion: `bash factory/checks.sh`
-   exits 0 on a clean project and non-zero on a deliberately broken YAML/shell
-   file.
-3. **Phase 2 — land the port.** Commit `.opencode/` + `factory/` + project docs
-   + `.gitignore` + labels. Exit criterion: one real issue through to a
-   merged-or-escalated PR with the human reading every step.
-4. **Phase 3 — scope the remit.** Decide what the `factory` label is *allowed*
-   to touch. Options: (a) keep the approver escalating — factory = PR drafter +
-   reviewer, human merges; (b) restrict the label to docs, `skills/`, the
-   factory itself, and version bumps. **Chosen: (a).** `job handoff` readies the
+1. **Phase 0 — spike (no repo risk).** Done: ported the agents and command,
+   dropped the hook, rewrote `job`'s cost query and set `concurrency: 1`. The
+   spike took issue #4 → PR #5 from `intake` to a human merge, recording every
+   subagent session ID. The builder needed no second round, so the resume path
+   is covered by the `subagent` contract and unit tests rather than a live
+   retry; cost has DB and API fallbacks.
+2. **Phase 1 — make the gate real.** Done: `factory/checks.sh` passes on the
+   base branch and fails on a deliberately broken shell fixture. The gate is
+   static-only and runs against `FACTORY_PROJECT`.
+3. **Phase 2 — land the port.** Done: `.opencode/` + `factory/` + project docs
+   + `.gitignore` + labels are on `main`. One real issue went through to a
+   merged PR with the human making the final call.
+4. **Phase 3 — scope the remit.** Decided: keep the approver escalating — the
+   factory drafts and reviews PRs, a human merges. `job handoff` readies the
    PR and a human always merges; the port contains no auto-merge call.
 
 ## 10. Risks and open questions

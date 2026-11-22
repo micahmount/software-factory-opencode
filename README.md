@@ -82,8 +82,24 @@ existing installation. Run `/factory run` in the project to drain its queue.
 - [x] Design and upstream-to-OpenCode porting map (`DESIGN.md`)
 - [x] Static gate implemented and proven green/red
 - [x] OpenCode agents and command port
-- [ ] One real issue taken end-to-end to an open PR
+- [x] One real issue taken end-to-end to a PR
 - [x] Remit narrowed deliberately: draft/review only, human merges
+
+## End-to-end spike
+
+On 22 Nov 2026, issue #4 ("Add a factory smoke test note") went through the
+whole pipeline: intake ACCEPT (low risk, no surfaces) → route → spec → builder →
+gate PASS → routed code review PASS → approver APPROVE → `job handoff` → human
+merge of PR #5. The job added only `SMOKE.md`; the state and evidence remain in
+`factory/jobs/001-add-a-factory-smoke/` (`round-1/checks.md`,
+`round-1/review-code.md` and `decision.md`), and `job summary` recorded both
+`needs-human` after handoff and `merged` after the human merged.
+
+The local runtime had no frontier credentials, so the spike overrode each
+subagent with the available `opencode/big-pickle` model. Agent definitions and
+`factory/config.json` still route production work to `anthropic/...`; a target
+project needs those credentials. The session-ID recording, cost fallback and
+resume contract are covered by unit tests.
 
 ## Static gate
 
