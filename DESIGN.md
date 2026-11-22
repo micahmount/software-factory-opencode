@@ -2,7 +2,7 @@
 
 **Status:** accepted — port implemented; end-to-end spike complete
 **Date:** 17 Nov 2026
-**Updated:** 22 Nov 2026 (port landed, human-merge remit chosen, install support added, spike proven)
+**Updated:** 22 Nov 2026 (port landed, install support added, spike proven, upstream approval semantics restored)
 **Upstream:** [`zazencodes/zazencodes-season-3/src/software-factory-claude-code-v2`](https://github.com/zazencodes/zazencodes-season-3/tree/main/src/software-factory-claude-code-v2) (GPLv3)
 
 ## 1. Summary
@@ -20,8 +20,10 @@ questions, two answers:
 | Should it be adopted *on a project repo*? | **Partly.** The port is cheap. The fit is the hard part: projects rarely have one universal test suite, and runtime verification stays a human responsibility — a static gate cannot satisfy that. |
 
 Recommendation: **port it, then scope its remit deliberately** (see §9, Phase 3).
-Adopt it as a PR-drafting + review machine with the human in the merge path, not
-as an autonomous loop that merges infra changes.
+Adopt the upstream approval contract: the approver is a judgment gate that
+`APPROVE auto-merges` in-scope changes and uses `ESCALATE parks the job` only for
+the specific risks listed in its agent definition. Keep those risk lists tailored
+to the target project.
 
 ## 2. Background: how the factory works
 
@@ -170,10 +172,12 @@ runtime verification stays a human step under the project's own rules.
 
 ### 6.3 Consequence for the approver
 
-The approver escalates anything that changes deploy, CI or hosting config. Each
-project defines what that means; the safe default is to escalate rather than
-auto-merge. That is not the autonomous loop the upstream design advertises, so
-the remit must be chosen deliberately (§9, Phase 3).
+The approver follows upstream: `APPROVE auto-merges` an in-scope change after the
+merge-time re-gate, while `ESCALATE parks the job` only for its explicit
+conditions — failed criteria or changes touching money/access/identity,
+deploy/CI/hosting, schemas, production data, dependencies, or product/business
+decisions. Each project tailors those lists; the approver should not escalate
+merely to be safe.
 
 ## 7. Where it runs
 
@@ -202,8 +206,10 @@ meaningful.
 
 1. **Phase 0 — spike (no repo risk).** Done: ported the agents and command,
    dropped the hook, rewrote `job`'s cost query and set `concurrency: 1`. The
-   spike took issue #4 → PR #5 from `intake` to a human merge, recording every
-   subagent session ID. The builder needed no second round, so the resume path
+   spike took issue #4 → PR #5 through `intake`, `spec`, `build`, `gate` and
+   `review`, recording every subagent session ID. It used an interim human-merge
+   path; the upstream `APPROVE → job merge` contract was restored after
+   re-reading the source. The builder needed no second round, so the resume path
    is covered by the `subagent` contract and unit tests rather than a live
    retry; cost has DB and API fallbacks.
 2. **Phase 1 — make the gate real.** Done: `factory/checks.sh` passes on the
@@ -211,17 +217,18 @@ meaningful.
    static-only and runs against `FACTORY_PROJECT`.
 3. **Phase 2 — land the port.** Done: `.opencode/` + `factory/` + project docs
    + `.gitignore` + labels are on `main`. One real issue went through to a
-   merged PR with the human making the final call.
-4. **Phase 3 — scope the remit.** Decided: keep the approver escalating — the
-   factory drafts and reviews PRs, a human merges. `job handoff` readies the
-   PR and a human always merges; the port contains no auto-merge call.
+   merged PR, and every stage decision is recorded on disk.
+4. **Phase 3 — scope the remit.** Decided: follow upstream. The approver is a
+   judgment gate: `APPROVE` calls `job merge`, which re-syncs, re-runs the gate
+   and calls `gh pr merge`. `ESCALATE` parks the job for a human only for the
+   approver's enumerated high-risk or failed-criteria conditions.
 
 ## 10. Risks and open questions
 
 | Risk | Impact | Mitigation |
 |---|---|---|
 | **GPLv3** | the port is a derivative work of a GPLv3 program | decided: direct port published as GPLv3 with upstream LICENSE + NOTICE; sell the *outputs*, not the factory. See below. |
-| Gate is static-only | a passing branch can still break runtime behaviour | approver escalates anything runtime-shaped; keep the human merge |
+| Gate is static-only | a passing branch can still break runtime behaviour | approver escalates the enumerated runtime-shaped risks; low-risk in-scope changes auto-merge after the re-gate |
 | No test suite | the gate is new code with no tests | keep it small and deterministic; test it against known-bad files |
 | Builder hook rewrite | upstream nudge is lost if dropped | the gate already enforces after the build; a plugin hook is optional polish |
 | Cost accounting | upstream's transcript format is Claude-specific | OpenCode stores cost/tokens per session; sum the child sessions tied to a job |

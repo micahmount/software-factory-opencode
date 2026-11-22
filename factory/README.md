@@ -98,14 +98,22 @@ overridable with `OPENCODE_DB`). The orchestrator records each subagent's
 prompt is a fallback for older jobs. No Claude transcript parsing is involved.
 
 There is no builder stop hook: the gate always runs after the build, before any
-reviewer, and again on handoff.
+reviewer, and again before an approved PR merges.
 
-## Human merge remit
+## Approver decision and merge
 
-`job handoff` (also callable as `job merge` for compatibility) syncs with the
-base branch, re-runs the gate, pushes and readies the PR, then moves the job to
-`needs-human`. The factory never merges. A human reviews and merges, or sends
-feedback with `job feedback`.
+The approver reads the spec, evidence, gate and reviews, then writes `APPROVE` or
+`ESCALATE` to `decision.md`. `APPROVE` means the factory merges the PR with no
+human looking: `job merge` syncs with the base branch, re-runs the gate, pushes,
+readies a draft PR, calls `gh pr merge` with `config.json`'s `merge_method`,
+deletes the merged branch and moves the job to `merged`. A conflict, failed gate
+or failed merge moves the job to `needs-human` with the reason.
+
+`ESCALATE` is for failed acceptance criteria and the approver's explicit
+high-risk list — money/access/identity, deploy/CI/hosting, schema or production
+data changes, dependencies, and product or business decisions. The orchestrator
+readies the PR, posts the decision and labels the issue `factory:needs-human`.
+A person can then give feedback with `job feedback` or merge the PR by hand.
 
 ## Install and labels
 

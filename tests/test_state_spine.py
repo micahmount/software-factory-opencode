@@ -128,7 +128,7 @@ class StateSpineTests(unittest.TestCase):
             "security": "anthropic/claude-opus-5-5",
         })
 
-    def test_handoff_readies_the_pr_but_never_merges_it(self):
+    def test_merge_merges_an_approved_pr(self):
         job_mod = load_script("job")
         configure(job_mod, self.root)
         job = make_job(self.root, stage="merging", round=1)
@@ -137,10 +137,10 @@ class StateSpineTests(unittest.TestCase):
         )
         calls = []
         transitions = []
-        original_sync, original_save = job_mod.sync, job_mod.save
-        original_advance, original_git = job_mod.advance, job_mod.git
-        original_pr_state, original_gh = job_mod.pr_state, job_mod.gh
-        original_gh_json, original_run = job_mod.gh_json, job_mod.subprocess.run
+        originals = {name: getattr(job_mod, name) for name in (
+            "sync", "save", "advance", "git", "run", "pr_state", "gh", "gh_json"
+        )}
+        original_subprocess_run = job_mod.subprocess.run
 
         class Result:
             returncode = 0
@@ -151,20 +151,64 @@ class StateSpineTests(unittest.TestCase):
         job_mod.save = lambda j: calls.append(("save", j["stage"]))
         job_mod.advance = lambda j, stage: (transitions.append(stage), j)[1]
         job_mod.git = lambda j, *args, check=True: Result()
+        job_mod.run = lambda args, **kwargs: calls.append(("run", args)) or Result()
         job_mod.pr_state = lambda j: "OPEN"
         job_mod.gh = lambda *args: calls.append(("gh", args)) or ""
         job_mod.gh_json = lambda *args: {"isDraft": True}
         job_mod.subprocess.run = lambda *args, **kwargs: Result()
         try:
-            job_mod.cmd_handoff(job)
+            job_mod.cmd_merge(job)
         finally:
-            job_mod.sync, job_mod.save = original_sync, original_save
-            job_mod.advance, job_mod.git = original_advance, original_git
-            job_mod.pr_state, job_mod.gh = original_pr_state, original_gh
-            job_mod.gh_json, job_mod.subprocess.run = original_gh_json, original_run
+            for name, value in originals.items():
+                setattr(job_mod, name, value)
+            job_mod.subprocess.run = original_subprocess_run
+
+        self.assertEqual(transitions[-1], "merged")
+        self.assertIn(("gh", ("pr", "ready", "34")), calls)
+        self.assertIn(("gh", ("pr", "merge", "34", "--squash")), calls)
+        self.assertTrue(any(call[0] == "run" and "--delete" in call[1] for call in calls))
+
+    def test_merge_escalates_when_sync_conflicts(self):
+        job_mod = load_script("job")
+        configure(job_mod, self.root)
+        job = make_job(self.root, stage="merging", round=1)
+        calls = []
+        transitions = []
+        originals = {name: getattr(job_mod, name) for name in (
+            "sync", "save", "advance", "git", "run", "pr_state", "gh", "gh_json", "escalate"
+        )}
+        original_subprocess_run = job_mod.subprocess.run
+
+        class Result:
+            def __init__(self, code=0, stdout=""):
+                self.returncode = code
+                self.stdout = stdout
+                self.stderr = ""
+
+        def fake_git(j, *args, check=True):
+            if args[0] == "merge":
+                return Result(1, "conflict")
+            return Result()
+
+        job_mod.sync = lambda j: j
+        job_mod.save = lambda j: calls.append(("save", j["stage"]))
+        job_mod.advance = lambda j, stage: (transitions.append(stage), j)[1]
+        job_mod.git = fake_git
+        job_mod.run = lambda args, **kwargs: Result()
+        job_mod.pr_state = lambda j: "OPEN"
+        job_mod.gh = lambda *args: calls.append(("gh", args)) or ""
+        job_mod.gh_json = lambda *args: {"isDraft": False}
+        job_mod.escalate = lambda j, why: calls.append(("escalate", why.splitlines()[0]))
+        job_mod.subprocess.run = lambda *args, **kwargs: Result()
+        try:
+            job_mod.cmd_merge(job)
+        finally:
+            for name, value in originals.items():
+                setattr(job_mod, name, value)
+            job_mod.subprocess.run = original_subprocess_run
 
         self.assertEqual(transitions[-1], "needs-human")
-        self.assertIn(("gh", ("pr", "ready", "34")), calls)
+        self.assertTrue(any(call[0] == "escalate" for call in calls))
         self.assertFalse(any(call[0] == "gh" and "merge" in call[1] for call in calls))
 
     def test_gate_has_no_claude_hook_mode(self):

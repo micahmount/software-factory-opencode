@@ -3,7 +3,7 @@
 
 Usage:
   gate <job-id>            write round-N/checks.md; exit 0 on PASS, 1 on FAIL
-  gate <job-id> --merge    same, as round-N/merge-checks.md (job handoff runs it)
+  gate <job-id> --merge    same, as round-N/merge-checks.md (job merge runs it)
 
 The gate runs the main checkout's factory/checks.sh inside the job's worktree,
 so a branch can't change the checks it is judged by. It also fails when the

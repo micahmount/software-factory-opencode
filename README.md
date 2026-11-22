@@ -1,7 +1,8 @@
 # software-factory-opencode
 
 A software factory built on **OpenCode V2**. It turns a `factory`-labeled issue
-into a reviewed, human-approved pull request through a deterministic pipeline.
+into a reviewed pull request that the approver either merges or escalates through
+a deterministic pipeline.
 
 We use it as tooling to build our own products. The factory is not the product —
 the things it builds are.
@@ -12,7 +13,9 @@ The upstream project is an issue-driven factory written for Claude Code. This
 repository ports it to OpenCode V2 so the factory uses the same harness,
 worktrees and subagents we already use. Judgment calls — intake, spec, build and
 approval — stay on frontier models; local models are bounded to read-only and
-draft work. A human always makes the final merge call.
+draft work. The approver follows the upstream contract: `APPROVE auto-merges` a
+safe in-scope change; `ESCALATE parks the job` for a human when the approver's
+specific risk conditions apply.
 
 ## Pipeline
 
@@ -33,14 +36,16 @@ gate ─FAIL────────────┤  static checks run before an
         ▼ PASS        │
 reviewers ─CHANGES────┘  code, + ux/ui for UI changes, + security
         ▼ all PASS
-approver ── APPROVE → sync, re-run gate, hand to a human to merge
+approver ── APPROVE → sync, re-run gate, gh pr merge
          └─ ESCALATE → PR ready for a human, issue labeled needs-human
 ```
 
-`APPROVE` runs `factory/bin/job handoff`: it syncs with the base branch, re-runs
-the gate, pushes and marks the PR ready. It deliberately does **not** call a
-merge command. The load-bearing rule: **no reviewer runs on a failing build,
-and no merge happens without a human.**
+`APPROVE` runs `factory/bin/job merge`: it syncs with the base branch, re-runs
+the gate, pushes, calls `gh pr merge`, and cleans up the branch. `ESCALATE` is
+reserved for the approver's enumerated conditions — failed criteria or changes
+in money/access/identity, deploy/CI/hosting, schemas/production data/dependencies,
+or product/business decisions. The load-bearing rule: **no reviewer runs on a
+failing build, and only the approver's `APPROVE` triggers a merge.**
 
 ## What is in this repository
 
@@ -83,17 +88,22 @@ existing installation. Run `/factory run` in the project to drain its queue.
 - [x] Static gate implemented and proven green/red
 - [x] OpenCode agents and command port
 - [x] One real issue taken end-to-end to a PR
-- [x] Remit narrowed deliberately: draft/review only, human merges
+- [x] Upstream approval semantics: `APPROVE` merges, `ESCALATE` parks for a human
 
 ## End-to-end spike
 
 On 22 Nov 2026, issue #4 ("Add a factory smoke test note") went through the
 whole pipeline: intake ACCEPT (low risk, no surfaces) → route → spec → builder →
-gate PASS → routed code review PASS → approver APPROVE → `job handoff` → human
-merge of PR #5. The job added only `SMOKE.md`; the state and evidence remain in
+gate PASS → routed code review PASS → approver APPROVE → PR #5 merged. The job
+added only `SMOKE.md`; the state and evidence remain in
 `factory/jobs/001-add-a-factory-smoke/` (`round-1/checks.md`,
-`round-1/review-code.md` and `decision.md`), and `job summary` recorded both
-`needs-human` after handoff and `merged` after the human merged.
+`round-1/review-code.md` and `decision.md`), and `job summary` recorded both the
+interim `needs-human` state and the final `merged` state.
+
+That spike ran before the merge contract was compared against upstream: it used
+an interim human-merge path. The current code follows upstream exactly —
+`APPROVE` calls `job merge`, while `ESCALATE` is limited to the approver's
+specific conditions. Unit tests cover both the auto-merge and escalation paths.
 
 The local runtime had no frontier credentials, so the spike overrode each
 subagent with the available `opencode/big-pickle` model. Agent definitions and
