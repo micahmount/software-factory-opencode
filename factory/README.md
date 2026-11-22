@@ -121,3 +121,22 @@ A person can then give feedback with `job feedback` or merge the PR by hand.
 not overwrite an existing installation without `--force`, and it writes
 `.opencode/opencode.json` when the project already has a root `opencode.json`.
 `factory/labels` creates/updates the three labels named in `config.json`.
+
+### Verify an installation
+
+Run these from the target project, with a server rooted there:
+
+```bash
+opencode debug agents
+opencode api get /api/command --param 'location[directory]=/absolute/path/to/project'
+FACTORY_PROJECT=. FACTORY_BASE=main bash factory/checks.sh
+```
+
+Expect eight factory subagents (`intake`, `spec-writer`, `builder`, the four
+reviewers and `approver`) and a `factory` entry in the command list. Set
+`base_branch` in `factory/config.json` to the project's real base branch, and
+pass the same value as `FACTORY_BASE`, before the first run.
+
+Slash commands expand in the TUI. `opencode run '/factory status'` sends the
+literal text, so the agent has to discover the prompt file itself; start
+`opencode` in the project and use `/factory run` there.
