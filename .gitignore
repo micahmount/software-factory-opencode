@@ -1,4 +1,4 @@
 /factory/jobs/
-/worktrees/
+/.worktrees/
 __pycache__/
 *.pyc

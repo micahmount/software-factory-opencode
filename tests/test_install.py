@@ -54,16 +54,63 @@ class InstallTests(unittest.TestCase):
         settings = json.loads((self.target / ".opencode" / "opencode.json").read_text())
         self.assertEqual(settings["worktree"]["directory"], ".worktrees")
 
-    def test_install_refuses_to_clobber_and_force_replaces(self):
+    def test_install_refuses_to_clobber_and_force_replaces_factory_files(self):
         (self.target / "opencode.json").write_text("{}")
         self.assertEqual(run([str(INSTALL), str(self.target)]).returncode, 0)
         (self.target / ".opencode" / "agents" / "custom.md").write_text("custom\n")
+        (self.target / ".opencode" / "commands" / "custom.md").write_text("custom\n")
+        (self.target / ".opencode" / "agents" / "intake.md").write_text("stale\n")
         again = run([str(INSTALL), str(self.target)])
         self.assertNotEqual(again.returncode, 0)
         self.assertIn("already installed", again.stderr)
         forced = run([str(INSTALL), "--force", str(self.target)])
         self.assertEqual(forced.returncode, 0, forced.stderr)
-        self.assertFalse((self.target / ".opencode" / "agents" / "custom.md").exists())
+        self.assertEqual((self.target / ".opencode" / "agents" / "custom.md").read_text(), "custom\n")
+        self.assertEqual((self.target / ".opencode" / "commands" / "custom.md").read_text(), "custom\n")
+        self.assertNotIn("stale", (self.target / ".opencode" / "agents" / "intake.md").read_text())
+
+    def test_install_merges_existing_opencode_settings(self):
+        (self.target / ".opencode").mkdir()
+        (self.target / ".opencode" / "opencode.json").write_text(json.dumps({
+            "model": "keep/this",
+            "x": 1,
+            "worktree": {"directory": "custom-worktrees", "other": True},
+            "permissions": [{"action": "read", "resource": "custom/*", "effect": "allow"}],
+        }))
+        (self.target / ".opencode" / "agents").mkdir()
+        (self.target / ".opencode" / "agents" / "custom.md").write_text("custom\n")
+
+        res = run([str(INSTALL), str(self.target)])
+        self.assertEqual(res.returncode, 0, res.stderr)
+        settings = json.loads((self.target / ".opencode" / "opencode.json").read_text())
+        self.assertEqual(settings["model"], "keep/this")
+        self.assertEqual(settings["x"], 1)
+        self.assertTrue(settings["worktree"]["other"])
+        self.assertEqual(settings["worktree"]["directory"], ".worktrees")
+        rules = {(r["action"], r.get("resource")): r["effect"] for r in settings["permissions"]}
+        self.assertEqual(rules[("read", "custom/*")], "allow")
+        self.assertEqual(rules[("subagent", "*")], "allow")
+        self.assertEqual(rules[("shell", "gh pr merge *")], "ask")
+        self.assertTrue((self.target / ".opencode" / "agents" / "custom.md").exists())
+        self.assertTrue((self.target / ".opencode" / "agents" / "intake.md").exists())
+
+    def test_install_adds_runtime_paths_to_gitignore_without_clobbering(self):
+        (self.target / ".gitignore").write_text("*.log\n/factory/jobs/\n")
+        res = run([str(INSTALL), str(self.target)])
+        self.assertEqual(res.returncode, 0, res.stderr)
+        lines = (self.target / ".gitignore").read_text().splitlines()
+        self.assertIn("*.log", lines)
+        self.assertEqual(lines.count("/factory/jobs/"), 1)
+        self.assertIn("/.worktrees/", lines)
+
+    def test_install_provides_agents_md_without_overwriting_the_projects(self):
+        res = run([str(INSTALL), str(self.target)])
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertIn("factory/checks.sh", (self.target / "AGENTS.md").read_text())
+        (self.target / "AGENTS.md").write_text("project rules\n")
+        forced = run([str(INSTALL), "--force", str(self.target)])
+        self.assertEqual(forced.returncode, 0, forced.stderr)
+        self.assertEqual((self.target / "AGENTS.md").read_text(), "project rules\n")
 
     def test_install_rejects_a_non_git_directory(self):
         bare = Path(self.tmp.name) / "not-a-repo"
@@ -96,6 +143,11 @@ class LabelTests(unittest.TestCase):
 
 
 class DocsTests(unittest.TestCase):
+    def test_runtime_paths_are_ignored(self):
+        lines = (REPO / ".gitignore").read_text().splitlines()
+        self.assertIn("/factory/jobs/", lines)
+        self.assertIn("/.worktrees/", lines)
+
     def test_readme_documents_the_human_merge_remit(self):
         text = (REPO / "README.md").read_text()
         for phrase in ("job handoff", "human", "factory/install", "factory/labels"):
