@@ -21,6 +21,7 @@ immediate failure.
 | Tool | Status | Purpose |
 |------|--------|---------|
 | `python3` + PyYAML | required | parse YAML/JSON, cross-file assertions |
+| `pyyaml==6.0.2` | required | pinned YAML parser dev dependency installed from `requirements-dev.txt` |
 | `bash` | required | `bash -n` on shell syntax |
 | `shellcheck` | optional | lint on changed shell |
 
