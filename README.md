@@ -105,7 +105,18 @@ an interim human-merge path. The current code follows upstream exactly —
 `APPROVE` calls `job merge`, while `ESCALATE` is limited to the approver's
 specific conditions. Unit tests cover both the auto-merge and escalation paths.
 
-The local runtime had no frontier credentials, so the spike overrode each
+## Auto-merge run
+
+On 22 Nov 2026, issue #10 ("Add an auto-merge smoke note") went through the
+corrected pipeline as job `002-add-an-auto-merge`: intake ACCEPT (low risk, no
+surfaces) → route → spec → builder → `GATE: PASS` → code review PASS → approver
+`APPROVE` → `job merge 002-add-an-auto-merge` → PR #11 merged by the factory,
+with no human merge call. The merge-time re-gate is recorded in
+`factory/jobs/002-add-an-auto-merge/round-1/merge-checks.md`; the job ended in
+`merged` with five recorded subagent session IDs, the worktree removed and the
+remote branch deleted. The only source change was `AUTO_MERGE_SMOKE.md`.
+
+The local runtime had no frontier credentials, so both runs overrode each
 subagent with the available `opencode/big-pickle` model. Agent definitions and
 `factory/config.json` still route production work to `anthropic/...`; a target
 project needs those credentials. The session-ID recording, cost fallback and

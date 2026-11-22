@@ -42,6 +42,23 @@ class EvidenceDocsTests(unittest.TestCase):
         self.assertIn("ESCALATE parks the job", design)
         self.assertIn("gh pr merge", design)
 
+    def test_readme_records_a_real_auto_merge_run(self):
+        text = (REPO / "README.md").read_text()
+        for phrase in (
+            "issue #10",
+            "PR #11",
+            "AUTO_MERGE_SMOKE.md",
+            "job merge 002-add-an-auto-merge",
+            "round-1/merge-checks.md",
+            "no human merge call",
+        ):
+            self.assertIn(phrase, text, phrase)
+
+    def test_design_records_a_real_auto_merge_run(self):
+        text = (REPO / "DESIGN.md").read_text()
+        self.assertIn("issue #10 → PR #11", text)
+        self.assertIn("auto-merge path", text)
+
 
 if __name__ == "__main__":
     unittest.main()
