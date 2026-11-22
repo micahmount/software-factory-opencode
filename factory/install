@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""Drop the OpenCode factory into another project checkout.
+
+Usage:
+  factory/install [--force] <project-directory>
+
+Copies the harness-neutral factory (scripts, gate, config, dashboard) and the
+OpenCode-specific agents and command. Runtime state (factory/jobs, .worktrees)
+is never copied. An existing OpenCode config is preserved: the factory's
+settings go to <project>/.opencode/opencode.json instead of overwriting it.
+
+Use --force to replace a previously installed factory in the target.
+"""
+
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+SOURCE = Path(__file__).resolve().parents[1]
+COPY_FILES = [
+    "factory/checks.sh",
+    "factory/config.json",
+    "factory/dashboard.html",
+    "factory/install",
+    "factory/labels",
+    "factory/README.md",
+]
+COPY_DIRS = [
+    "factory/bin",
+    ".opencode/agents",
+    ".opencode/commands",
+]
+
+
+def die(msg):
+    print(f"install: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def is_repository(path):
+    res = subprocess.run(["git", "-C", str(path), "rev-parse", "--git-dir"],
+                         capture_output=True, text=True)
+    return res.returncode == 0
+
+
+def already_installed(target):
+    return any((target / p).exists() for p in [
+        "factory/bin/job", ".opencode/commands/factory.md", ".opencode/opencode.json",
+    ])
+
+
+def main(argv):
+    force = "--force" in argv
+    args = [a for a in argv if a != "--force"]
+    if len(args) != 1:
+        die(__doc__.strip())
+    target = Path(args[0]).expanduser().resolve()
+    if not target.is_dir():
+        die(f"{target} is not a directory")
+    if not is_repository(target):
+        die(f"{target} is not a git repository")
+    if already_installed(target) and not force:
+        die("factory is already installed in that project; use --force to replace it")
+
+    for rel in COPY_FILES:
+        dst = target / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(SOURCE / rel, dst)
+        if rel.startswith("factory/"):
+            dst.chmod(0o755)
+    for rel in COPY_DIRS:
+        dst = target / rel
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(SOURCE / rel, dst, ignore=shutil.ignore_patterns("__pycache__"))
+
+    settings = json.loads((SOURCE / "opencode.json").read_text())
+    if (target / "opencode.json").exists() or (target / ".opencode" / "opencode.json").exists():
+        settings_path = target / ".opencode" / "opencode.json"
+    else:
+        settings_path = target / "opencode.json"
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+
+    print(f"installed the OpenCode factory into {target}")
+    print("next: factory/labels, then /factory run")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

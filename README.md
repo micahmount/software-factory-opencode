@@ -37,25 +37,53 @@ approver ── APPROVE → sync, re-run gate, hand to a human to merge
          └─ ESCALATE → PR ready for a human, issue labeled needs-human
 ```
 
-The load-bearing rule: **no reviewer runs on a failing build, and no merge
-happens without a human.**
+`APPROVE` runs `factory/bin/job handoff`: it syncs with the base branch, re-runs
+the gate, pushes and marks the PR ready. It deliberately does **not** call a
+merge command. The load-bearing rule: **no reviewer runs on a failing build,
+and no merge happens without a human.**
 
 ## What is in this repository
 
 | Path | Purpose |
 |------|---------|
 | `DESIGN.md` | Design, upstream porting map, phased plan and licensing decision |
+| `AGENTS.md` | Project guidance loaded by agents in job worktrees |
+| `opencode.json` | V2 config: default model, worktree directory, permissions |
+| `.opencode/agents/` | Eight subagents: intake, spec, builder, four review lenses, approver |
+| `.opencode/commands/factory.md` | The single orchestrator prompt for `/factory` |
+| `factory/bin/job` | Job state machine and GitHub side effects; the only writer of `job.json` |
+| `factory/bin/gate` | Runs the main checkout's checks against a job worktree |
+| `factory/bin/route` | Maps risk and surfaces to reviewers and model IDs |
+| `factory/config.json` | Concurrency, rounds, labels, routing and prices |
 | `factory/checks.sh` | Deterministic static gate |
+| `factory/dashboard.html` | Local job dashboard |
+| `factory/install` | Drops the factory into another project |
+| `factory/labels` | Creates the three GitHub labels the factory uses |
 | `factory/README.md` | Gate checks, dependencies and usage |
 | `LICENSE`, `NOTICE` | GPLv3 license text and upstream attribution |
+
+## Install into a project
+
+From this checkout:
+
+```bash
+factory/install /path/to/project
+cd /path/to/project && factory/labels
+```
+
+The installer copies `factory/`, `.opencode/agents/` and
+`.opencode/commands/factory.md`. It preserves an existing `opencode.json` by
+writing the factory settings to `.opencode/opencode.json` instead. Runtime state
+(`factory/jobs/`, `.worktrees/`) is never copied. Use `--force` to replace an
+existing installation. Run `/factory run` in the project to drain its queue.
 
 ## Status
 
 - [x] Design and upstream-to-OpenCode porting map (`DESIGN.md`)
 - [x] Static gate implemented and proven green/red
-- [ ] OpenCode agents and command port (Phase 0 spike)
+- [x] OpenCode agents and command port
 - [ ] One real issue taken end-to-end to an open PR
-- [ ] Remit narrowed deliberately (draft/review only, human merges)
+- [x] Remit narrowed deliberately: draft/review only, human merges
 
 ## Static gate
 
