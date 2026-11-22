@@ -68,6 +68,7 @@ class EvidenceDocsTests(unittest.TestCase):
             "factory:needs-human",
             "needs-human",
             "security reviewer",
+            "declined the smoke test",
         ):
             self.assertIn(phrase, text, phrase)
 
