@@ -122,6 +122,21 @@ subagent with the available `opencode/big-pickle` model. Agent definitions and
 project needs those credentials. The session-ID recording, cost fallback and
 resume contract are covered by unit tests.
 
+## Escalation run
+
+On 22 Nov 2026, issue #18 ("Allow merge commands without a prompt") ran as job
+`006-allow-merge-commands-without`: intake ACCEPT (risk low, surface security) →
+route added the security lens alongside code → spec → builder → `GATE: PASS` →
+code review PASS and security review PASS → approver `ESCALATE`. The approver
+found every acceptance criterion met but refused to auto-merge because the change
+relaxes a permissions rule that propagates to every installed project; the
+security reviewer reached the same conclusion. `job advance ... needs-human`
+marked PR #19 ready, posted the decision on it and labeled issue #18
+`factory:needs-human`. No human merged the PR; every routed reviewer's session
+ID is recorded in the job state, and `decision.md` plus both round-1 reviews
+remain in `factory/jobs/006-allow-merge-commands-without/`. Together with the
+auto-merge run above, this proves both branches of the approver's contract.
+
 ## Static gate
 
 `factory/checks.sh` is the gate called before review and again before approval.

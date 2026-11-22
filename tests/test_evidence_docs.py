@@ -59,6 +59,18 @@ class EvidenceDocsTests(unittest.TestCase):
         self.assertIn("issue #10 → PR #11", text)
         self.assertIn("auto-merge path", text)
 
+    def test_readme_records_a_real_escalation_run(self):
+        text = (REPO / "README.md").read_text()
+        for phrase in (
+            "issue #18",
+            "PR #19",
+            "006-allow-merge-commands-without",
+            "factory:needs-human",
+            "needs-human",
+            "security reviewer",
+        ):
+            self.assertIn(phrase, text, phrase)
+
 
 if __name__ == "__main__":
     unittest.main()
