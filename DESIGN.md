@@ -1,8 +1,8 @@
 # Design: a software factory on OpenCode
 
-**Status:** accepted — port implemented; end-to-end spike complete
+**Status:** accepted — port implemented; end-to-end spike complete; auto-merge run verified
 **Date:** 17 Nov 2026
-**Updated:** 22 Nov 2026 (port landed, install support added, spike proven, upstream approval semantics restored)
+**Updated:** 22 Nov 2026 (port landed, install support added, spike proven, upstream approval semantics restored, auto-merge run verified)
 **Upstream:** [`zazencodes/zazencodes-season-3/src/software-factory-claude-code-v2`](https://github.com/zazencodes/zazencodes-season-3/tree/main/src/software-factory-claude-code-v2) (GPLv3)
 
 ## 1. Summary
@@ -209,9 +209,12 @@ meaningful.
    spike took issue #4 → PR #5 through `intake`, `spec`, `build`, `gate` and
    `review`, recording every subagent session ID. It used an interim human-merge
    path; the upstream `APPROVE → job merge` contract was restored after
-   re-reading the source. The builder needed no second round, so the resume path
-   is covered by the `subagent` contract and unit tests rather than a live
-   retry; cost has DB and API fallbacks.
+   re-reading the source. A second real run then took issue #10 → PR #11 on the
+   restored auto-merge path: `APPROVE` called `job merge`, which re-synced,
+   re-ran the gate and merged the PR with no human merge call. Both runs needed
+   no second build round, so the resume path is covered by the `subagent`
+   contract and unit tests rather than a live retry; cost has DB and API
+   fallbacks.
 2. **Phase 1 — make the gate real.** Done: `factory/checks.sh` passes on the
    base branch and fails on a deliberately broken shell fixture. The gate is
    static-only and runs against `FACTORY_PROJECT`.
