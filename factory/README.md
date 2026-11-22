@@ -81,3 +81,35 @@ FACTORY_PROJECT=/tmp/gate-fixture bash factory/checks.sh
 ```
 
 The broken-file path above is illustrative; pick a real `*.sh` in the project.
+
+## Ported factory spine
+
+| Path | Role |
+|------|------|
+| `bin/job` | State machine, GitHub side effects, cost accounting, session IDs |
+| `bin/gate` | Runs the main checkout's `checks.sh` in the job worktree; checks protected paths |
+| `bin/route` | Maps intake's risk/surfaces to reviewers and `anthropic/...` models |
+| `config.json` | Concurrency, labels, routing, ports and price reference |
+| `dashboard.html` | Reads `jobs/<id>/job.json` |
+
+Costs come from OpenCode's session database (`~/.local/share/opencode/opencode.db`,
+overridable with `OPENCODE_DB`). The orchestrator records each subagent's
+`sessionID` with `job session <job> <name> <id>`; the job header in the first user
+prompt is a fallback for older jobs. No Claude transcript parsing is involved.
+
+There is no builder stop hook: the gate always runs after the build, before any
+reviewer, and again on handoff.
+
+## Human merge remit
+
+`job handoff` (also callable as `job merge` for compatibility) syncs with the
+base branch, re-runs the gate, pushes and readies the PR, then moves the job to
+`needs-human`. The factory never merges. A human reviews and merges, or sends
+feedback with `job feedback`.
+
+## Install and labels
+
+`factory/install <project>` drops the port into another git checkout. It will
+not overwrite an existing installation without `--force`, and it writes
+`.opencode/opencode.json` when the project already has a root `opencode.json`.
+`factory/labels` creates/updates the three labels named in `config.json`.

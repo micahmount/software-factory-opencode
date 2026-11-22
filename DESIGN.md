@@ -1,8 +1,8 @@
 # Design: a software factory on OpenCode
 
-**Status:** accepted in principle — model track complete, factory port not started
+**Status:** accepted — port implemented; end-to-end spike pending
 **Date:** 17 Nov 2026
-**Updated:** 22 Nov 2026 (Phase 0 results, licensing decision, implementation order)
+**Updated:** 22 Nov 2026 (port landed, human-merge remit chosen, install support added)
 **Upstream:** [`zazencodes/zazencodes-season-3/src/software-factory-claude-code-v2`](https://github.com/zazencodes/zazencodes-season-3/tree/main/src/software-factory-claude-code-v2) (GPLv3)
 
 ## 1. Summary
@@ -193,9 +193,10 @@ details are deployment concerns, not part of the factory design.
 
 ## 9. Phased plan
 
-The model track above is complete. The factory phases below have not started.
-Implementation order differs from the numbering: **build the gate (item 2)
-before the spike (item 1)**, because the spike's `gate` stage calls `checks.sh`
+The model track, gate and OpenCode port are complete. The remaining work is the
+end-to-end spike in a target project. Implementation order differed from the
+numbering: **the gate (item 2) was built before the spike (item 1)**, because the
+spike's `gate` stage calls `checks.sh`
 and upstream's version is not useful for a generic project. A gate that is green
 on the base branch and red on a broken fixture is what makes the spike
 meaningful.
@@ -214,7 +215,8 @@ meaningful.
 4. **Phase 3 — scope the remit.** Decide what the `factory` label is *allowed*
    to touch. Options: (a) keep the approver escalating — factory = PR drafter +
    reviewer, human merges; (b) restrict the label to docs, `skills/`, the
-   factory itself, and version bumps.
+   factory itself, and version bumps. **Chosen: (a).** `job handoff` readies the
+   PR and a human always merges; the port contains no auto-merge call.
 
 ## 10. Risks and open questions
 
