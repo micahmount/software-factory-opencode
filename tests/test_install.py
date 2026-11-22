@@ -158,3 +158,13 @@ class DocsTests(unittest.TestCase):
         text = (REPO / "AGENTS.md").read_text()
         self.assertIn("python3 -m unittest discover -s tests", text)
         self.assertIn("factory/checks.sh", text)
+
+    def test_factory_readme_documents_live_install_verification(self):
+        text = (REPO / "factory/README.md").read_text()
+        for phrase in (
+            "opencode debug agents",
+            "opencode api get /api/command",
+            "location[directory]",
+            "Slash commands expand in the TUI",
+        ):
+            self.assertIn(phrase, text, phrase)
