@@ -90,7 +90,7 @@ class InstallTests(unittest.TestCase):
         rules = {(r["action"], r.get("resource")): r["effect"] for r in settings["permissions"]}
         self.assertEqual(rules[("read", "custom/*")], "allow")
         self.assertEqual(rules[("subagent", "*")], "allow")
-        self.assertEqual(rules[("shell", "gh pr merge *")], "ask")
+        self.assertEqual(rules[("shell", "gh pr merge *")], "allow")
         self.assertTrue((self.target / ".opencode" / "agents" / "custom.md").exists())
         self.assertTrue((self.target / ".opencode" / "agents" / "intake.md").exists())
 

@@ -6,6 +6,6 @@
   },
   "permissions": [
     { "action": "subagent", "resource": "*", "effect": "allow" },
-    { "action": "shell", "resource": "gh pr merge *", "effect": "ask" }
+    { "action": "shell", "resource": "gh pr merge *", "effect": "allow" }
   ]
 }
