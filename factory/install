@@ -6,10 +6,11 @@ Usage:
 
 Copies the harness-neutral factory (scripts, gate, config, dashboard) and the
 OpenCode-specific agents and command. Runtime state (factory/jobs, .worktrees)
-is never copied. An existing OpenCode config is preserved: the factory's
-settings go to <project>/.opencode/opencode.json instead of overwriting it.
+is never copied. Existing project files are preserved: OpenCode settings are
+merged into <project>/.opencode/opencode.json, AGENTS.md is only created when
+absent, and custom agents/commands and .gitignore lines are kept.
 
-Use --force to replace a previously installed factory in the target.
+Use --force to replace a previously installed factory's own files.
 """
 
 import json
@@ -32,11 +33,24 @@ COPY_DIRS = [
     ".opencode/agents",
     ".opencode/commands",
 ]
+MARKERS = [
+    "factory/bin/job",
+    "factory/config.json",
+    ".opencode/commands/factory.md",
+]
+RUNTIME_IGNORES = ["/factory/jobs/", "/.worktrees/"]
 
 
 def die(msg):
     print(f"install: {msg}", file=sys.stderr)
     sys.exit(1)
+
+
+def load_json(path, label):
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError) as e:
+        die(f"cannot read {label}: {e}")
 
 
 def is_repository(path):
@@ -46,9 +60,40 @@ def is_repository(path):
 
 
 def already_installed(target):
-    return any((target / p).exists() for p in [
-        "factory/bin/job", ".opencode/commands/factory.md", ".opencode/opencode.json",
-    ])
+    return any((target / p).exists() for p in MARKERS)
+
+
+def merge_settings(factory, existing):
+    """Keep the project's settings while enforcing the factory's worktree."""
+    merged = dict(existing)
+    merged.setdefault("$schema", factory["$schema"])
+    merged.setdefault("model", factory["model"])
+
+    worktree = dict(existing.get("worktree") or {})
+    worktree["directory"] = factory["worktree"]["directory"]
+    merged["worktree"] = worktree
+
+    required = {(r["action"], r.get("resource")): r
+                for r in factory.get("permissions", []) if isinstance(r, dict)}
+    rules = []
+    for rule in existing.get("permissions", []):
+        if not isinstance(rule, dict):
+            rules.append(rule)
+            continue
+        if (rule.get("action"), rule.get("resource")) not in required:
+            rules.append(rule)
+    rules.extend(required.values())
+    merged["permissions"] = rules
+    return merged
+
+
+def ensure_gitignore(target):
+    path = target / ".gitignore"
+    lines = path.read_text().splitlines() if path.exists() else []
+    for entry in RUNTIME_IGNORES:
+        if entry not in lines:
+            lines.append(entry)
+    path.write_text("\n".join(lines) + "\n")
 
 
 def main(argv):
@@ -72,17 +117,27 @@ def main(argv):
             dst.chmod(0o755)
     for rel in COPY_DIRS:
         dst = target / rel
-        if dst.exists():
-            shutil.rmtree(dst)
-        shutil.copytree(SOURCE / rel, dst, ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copytree(SOURCE / rel, dst,
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+                        dirs_exist_ok=True)
 
-    settings = json.loads((SOURCE / "opencode.json").read_text())
-    if (target / "opencode.json").exists() or (target / ".opencode" / "opencode.json").exists():
-        settings_path = target / ".opencode" / "opencode.json"
+    agents_md = target / "AGENTS.md"
+    if not agents_md.exists():
+        shutil.copy2(SOURCE / "AGENTS.md", agents_md)
+    ensure_gitignore(target)
+
+    factory_settings = load_json(SOURCE / "opencode.json", "source opencode.json")
+    root_config = target / "opencode.json"
+    nested_config = target / ".opencode" / "opencode.json"
+    settings_path = nested_config if (root_config.exists() or nested_config.exists()) else root_config
+    if settings_path.exists():
+        existing = load_json(settings_path, settings_path)
+    elif settings_path != root_config and root_config.exists():
+        existing = load_json(root_config, root_config)
     else:
-        settings_path = target / "opencode.json"
+        existing = {}
     settings_path.parent.mkdir(parents=True, exist_ok=True)
-    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+    settings_path.write_text(json.dumps(merge_settings(factory_settings, existing), indent=2) + "\n")
 
     print(f"installed the OpenCode factory into {target}")
     print("next: factory/labels, then /factory run")
