@@ -29,6 +29,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -277,32 +278,55 @@ def first_user_prompt(con, session_id):
     return ""
 
 
+def api_session_cost(session_id):
+    """Read a live session's cost from the OpenCode API when the DB hasn't flushed."""
+    path = urllib.parse.quote(session_id, safe="")
+    try:
+        res = subprocess.run(["opencode", "api", "get", f"/api/session/{path}"],
+                             capture_output=True, text=True)
+    except OSError:
+        return None
+    if res.returncode:
+        return None
+    try:
+        return (json.loads(res.stdout).get("data") or {}).get("cost")
+    except (ValueError, AttributeError):
+        return None
+
+
 def cost_usd(job):
     """Cost of every OpenCode subagent session tied to this job.
 
     The orchestrator records each spawned session ID in job.json (`sessions`),
     so a resumed builder counts once. Older jobs are still found by the job
     header in the first user prompt. OpenCode stores the computed cost on the
-    session row; no transcript scraping or price table is needed.
+    session row; a running service may not have written it yet, so recorded
+    sessions are looked up through the API as a fallback.
     """
-    path = opencode_db()
-    if not path:
-        return 0.0
     recorded = set((job.get("sessions") or {}).values())
-    needle = f"Job: {job['id']}."
     total = 0.0
     seen = set()
-    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    try:
-        sessions = con.execute("select id, parent_id, cost from session").fetchall()
-        for session_id, parent_id, cost in sessions:
-            if session_id in seen:
-                continue
-            if session_id in recorded or (parent_id and needle in first_user_prompt(con, session_id)):
-                total += cost or 0.0
-                seen.add(session_id)
-    finally:
-        con.close()
+    db_ids = set()
+    path = opencode_db()
+    if path:
+        needle = f"Job: {job['id']}."
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            sessions = con.execute("select id, parent_id, cost from session").fetchall()
+            for session_id, parent_id, cost in sessions:
+                if session_id in seen:
+                    continue
+                if session_id in recorded or (parent_id and needle in first_user_prompt(con, session_id)):
+                    total += cost or 0.0
+                    seen.add(session_id)
+                    db_ids.add(session_id)
+        finally:
+            con.close()
+    for session_id in sorted(recorded - db_ids):
+        cost = api_session_cost(session_id)
+        if cost is not None:
+            total += cost
+            seen.add(session_id)
     return round(total, 2)
 
 
